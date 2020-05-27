@@ -1,1 +1,2 @@
 pyspark==2.4.4
+pyparsing~=2.4.7

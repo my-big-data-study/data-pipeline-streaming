@@ -1,6 +1,7 @@
+from pyparsing import col
 from pyspark.sql import SparkSession
-from pyspark.sql.types import *
 from pyspark.sql.functions import *
+from pyspark.sql.types import *
 
 
 def run(spark):
@@ -29,9 +30,13 @@ def run(spark):
         .withColumn('item', explode(col('payload.items'))) \
         .withColumn('Title', col('item.title')) \
         .withColumn('Quantity', col('item.quantity')) \
+        .withColumn('timestamp', to_timestamp(col('timestamp'))) \
         .select(col('Title'), col('Quantity'), col('timestamp')) \
+        .withWatermark("timestamp", "1 seconds") \
+        .groupBy(window('timestamp', "10 seconds", "3 seconds"), col('Title')).agg(sum('Quantity').alias('count')) \
+        .orderBy(col('window.start').asc()) \
         .writeStream \
-        .outputMode('append') \
+        .outputMode('complete') \
         .format('console') \
         .option('truncate', 'false') \
         .start() \
@@ -42,7 +47,7 @@ if __name__ == '__main__':
     spark_session = SparkSession \
         .builder \
         .appName('Order Event Streaming Processor') \
-        .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:2.4.4')\
+        .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.4') \
         .config('spark.driver.host', '127.0.0.1') \
         .master('local') \
         .getOrCreate()
